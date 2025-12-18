@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Calendario Lavoro</title>
     
+    <!-- Librerie per export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -148,7 +152,9 @@
         }
 
         .btn-voice { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
-        .btn-copia { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+        .btn-export { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+        .btn-stats { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .btn-confronto { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
 
         .voice-status {
             margin-top: 10px;
@@ -159,6 +165,17 @@
             color: #666;
             text-align: center;
             min-height: 20px;
+        }
+
+        .voice-status.listening {
+            background: #fee140;
+            color: #333;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
 
         .modal {
@@ -182,6 +199,8 @@
             padding: 25px;
             width: 90%;
             max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
         }
 
         .modal-header {
@@ -223,7 +242,7 @@
             font-size: 16px;
         }
 
-        .modal-actions { display: flex; gap: 10px; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 10px; }
 
         .btn-conferma {
             flex: 1;
@@ -260,6 +279,73 @@
             color: #666;
             background: #f0f0f0;
         }
+
+        /* Export modal */
+        .export-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .export-btn {
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .export-copia { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .export-pdf { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .export-excel { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+
+        /* Stats modal */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 15px;
+            border-radius: 12px;
+            color: white;
+            text-align: center;
+        }
+
+        .stat-card-label { font-size: 12px; opacity: 0.9; margin-bottom: 5px; }
+        .stat-card-value { font-size: 24px; font-weight: bold; }
+
+        /* Confronto in modal */
+        .confronto-modal {
+            margin-top: 15px;
+        }
+
+        .confronto-modal h4 {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .mese-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .mese-nome { color: #666; font-size: 14px; font-weight: 500; }
+        .mese-totale { color: #667eea; font-weight: bold; font-size: 16px; }
     </style>
 </head>
 <body>
@@ -293,11 +379,14 @@
 
         <div class="voice-section">
             <button class="btn btn-voice" onclick="avviaVoce()">🎤 Aggiungi con voce</button>
-            <button class="btn btn-copia" onclick="copiaRiepilogo()">📋 Copia riepilogo mese</button>
+            <button class="btn btn-stats" onclick="apriStats()">📊 Statistiche</button>
+            <button class="btn btn-confronto" onclick="apriConfronto()">📈 Confronto mesi</button>
+            <button class="btn btn-export" onclick="apriExport()">📤 Condividi/Esporta</button>
             <div id="voiceStatus" class="voice-status"></div>
         </div>
     </div>
 
+    <!-- Modal giornata -->
     <div class="modal" id="modal">
         <div class="modal-content">
             <div class="modal-header" id="modalHeader"></div>
@@ -324,11 +413,81 @@
         </div>
     </div>
 
+    <!-- Modal export -->
+    <div class="modal" id="modalExport">
+        <div class="modal-content">
+            <div class="modal-header">📤 Condividi/Esporta</div>
+            
+            <div class="export-options">
+                <button class="export-btn export-copia" onclick="copiaRiepilogo()">
+                    📋 Copia testo
+                </button>
+                <button class="export-btn export-pdf" onclick="esportaPDF()">
+                    📄 Scarica PDF
+                </button>
+                <button class="export-btn export-excel" onclick="esportaExcel()">
+                    📊 Scarica Excel
+                </button>
+            </div>
+
+            <div class="modal-actions" style="margin-top: 20px;">
+                <button class="btn-annulla" onclick="chiudiExport()">Chiudi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal statistiche -->
+    <div class="modal" id="modalStats">
+        <div class="modal-content">
+            <div class="modal-header">📊 Statistiche Mese</div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-card-label">Giorni lavorati</div>
+                    <div class="stat-card-value" id="statGiorni">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">Media/giorno</div>
+                    <div class="stat-card-value" id="statMedia">0€</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <div class="stat-card-label">Infrasettimanali</div>
+                    <div class="stat-card-value" id="statInfra">0</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                    <div class="stat-card-label">Weekend</div>
+                    <div class="stat-card-value" id="statWeekend">0</div>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-annulla" onclick="chiudiStats()">Chiudi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal confronto -->
+    <div class="modal" id="modalConfronto">
+        <div class="modal-content">
+            <div class="modal-header">📈 Confronto Mesi</div>
+            
+            <div class="confronto-modal">
+                <h4>Ultimi 3 mesi</h4>
+                <div id="confrontoContent"></div>
+            </div>
+
+            <div class="modal-actions" style="margin-top: 20px;">
+                <button class="btn-annulla" onclick="chiudiConfronto()">Chiudi</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let giornate = {};
         let meseCorrente = new Date();
         let giornoSelezionato = null;
         let recognition = null;
+        let isListening = false;
 
         window.addEventListener('load', () => {
             caricaDati();
@@ -392,6 +551,7 @@
             }
             
             aggiornaTotale();
+            aggiornaStatistiche();
         }
 
         function cambioMese(dir) {
@@ -414,23 +574,106 @@
             document.getElementById('totale').textContent = totale.toFixed(2) + '€';
         }
 
+        function aggiornaStatistiche() {
+            const anno = meseCorrente.getFullYear();
+            const mese = meseCorrente.getMonth();
+            
+            let giorni = 0;
+            let totale = 0;
+            let infraCount = 0;
+            let infraTotale = 0;
+            let weekendCount = 0;
+            let weekendTotale = 0;
+            
+            Object.keys(giornate).forEach(dataStr => {
+                const data = new Date(dataStr + 'T12:00:00');
+                if (data.getFullYear() === anno && data.getMonth() === mese) {
+                    giorni++;
+                    totale += giornate[dataStr].importo;
+                    
+                    if (giornate[dataStr].tipo === 'weekend') {
+                        weekendCount++;
+                        weekendTotale += giornate[dataStr].importo;
+                    } else if (giornate[dataStr].tipo === 'infrasettimanale') {
+                        infraCount++;
+                        infraTotale += giornate[dataStr].importo;
+                    }
+                }
+            });
+            
+            const media = giorni > 0 ? (totale / giorni) : 0;
+            
+            document.getElementById('statGiorni').textContent = giorni;
+            document.getElementById('statMedia').textContent = media.toFixed(0) + '€';
+            document.getElementById('statInfra').textContent = infraCount + ' (' + infraTotale.toFixed(0) + '€)';
+            document.getElementById('statWeekend').textContent = weekendCount + ' (' + weekendTotale.toFixed(0) + '€)';
+        }
+
+        function apriStats() {
+            aggiornaStatistiche();
+            document.getElementById('modalStats').classList.add('show');
+        }
+
+        function chiudiStats() {
+            document.getElementById('modalStats').classList.remove('show');
+        }
+
+        function apriConfronto() {
+            aggiornaConfronto();
+            document.getElementById('modalConfronto').classList.add('show');
+        }
+
+        function chiudiConfronto() {
+            document.getElementById('modalConfronto').classList.remove('show');
+        }
+
+        function aggiornaConfronto() {
+            const oggi = new Date();
+            const mesi = [];
+            
+            for (let i = 0; i < 3; i++) {
+                const data = new Date(oggi.getFullYear(), oggi.getMonth() - i, 1);
+                mesi.push(data);
+            }
+            
+            const nomiMesi = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+                             'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+            
+            let html = '';
+            
+            mesi.forEach(data => {
+                const anno = data.getFullYear();
+                const mese = data.getMonth();
+                let totale = 0;
+                
+                Object.keys(giornate).forEach(dataStr => {
+                    const d = new Date(dataStr + 'T12:00:00');
+                    if (d.getFullYear() === anno && d.getMonth() === mese) {
+                        totale += giornate[dataStr].importo;
+                    }
+                });
+                
+                html += '<div class="mese-row">';
+                html += '<div class="mese-nome">' + nomiMesi[mese] + ' ' + anno + '</div>';
+                html += '<div class="mese-totale">' + totale.toFixed(2) + '€</div>';
+                html += '</div>';
+            });
+            
+            document.getElementById('confrontoContent').innerHTML = html;
+        }
+
         function apriModal(dataStr) {
             giornoSelezionato = dataStr;
-            console.log('Apertura modal per:', dataStr);
-            console.log('Giornata esistente?', giornate[dataStr]);
-            
             const data = new Date(dataStr + 'T12:00:00');
             const giorno = data.getDate();
             const nomiMesi = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
                              'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
             
             if (giornate[dataStr]) {
-                console.log('Mostrando pulsante ELIMINA');
                 document.getElementById('modalHeader').textContent = giorno + ' ' + nomiMesi[data.getMonth()] + ' - ' + giornate[dataStr].importo + '€';
                 document.getElementById('modalActions').style.display = 'none';
                 document.getElementById('modalActionsElimina').style.display = 'flex';
             } else {
-                console.log('Mostrando pulsanti AGGIUNGI');
                 document.getElementById('modalHeader').textContent = 'Aggiungi ' + giorno + ' ' + nomiMesi[data.getMonth()];
                 document.getElementById('modalActions').style.display = 'flex';
                 document.getElementById('modalActionsElimina').style.display = 'none';
@@ -478,15 +721,8 @@
         }
 
         function eliminaGiornata() {
-            console.log('Eliminazione chiamata per:', giornoSelezionato);
-            if (!giornoSelezionato) {
-                alert('Errore: nessun giorno selezionato');
-                return;
-            }
-            // Rimosso confirm - elimina direttamente
-            console.log('Prima eliminazione:', giornate);
+            if (!giornoSelezionato) return;
             delete giornate[giornoSelezionato];
-            console.log('Dopo eliminazione:', giornate);
             salvaDati();
             renderCalendario();
             chiudiModal();
@@ -498,11 +734,24 @@
             status.textContent = msg;
             status.style.background = '#4caf50';
             status.style.color = 'white';
+            status.classList.remove('listening');
             setTimeout(() => {
                 status.textContent = '';
                 status.style.background = '#f0f0f0';
                 status.style.color = '#666';
             }, 2000);
+        }
+
+        // ============================================
+        // EXPORT
+        // ============================================
+
+        function apriExport() {
+            document.getElementById('modalExport').classList.add('show');
+        }
+
+        function chiudiExport() {
+            document.getElementById('modalExport').classList.remove('show');
         }
 
         function copiaRiepilogo() {
@@ -518,10 +767,7 @@
             Object.keys(giornate).forEach(dataStr => {
                 const data = new Date(dataStr + 'T12:00:00');
                 if (data.getFullYear() === anno && data.getMonth() === mese) {
-                    lista.push({
-                        data: data,
-                        importo: giornate[dataStr].importo
-                    });
+                    lista.push({ data: data, importo: giornate[dataStr].importo });
                     totale += giornate[dataStr].importo;
                 }
             });
@@ -553,6 +799,7 @@
             try {
                 document.execCommand('copy');
                 mostraFeedback('✓ Copiato!');
+                chiudiExport();
             } catch (err) {
                 mostraFeedback('❌ Errore');
             }
@@ -560,28 +807,166 @@
             document.body.removeChild(textarea);
         }
 
+        function esportaPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            const anno = meseCorrente.getFullYear();
+            const mese = meseCorrente.getMonth();
+            const nomiMesi = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+                             'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+            
+            doc.setFontSize(20);
+            doc.text('Calendario Lavoro', 105, 20, { align: 'center' });
+            
+            doc.setFontSize(16);
+            doc.text(nomiMesi[mese] + ' ' + anno, 105, 35, { align: 'center' });
+            
+            const lista = [];
+            let totale = 0;
+            
+            Object.keys(giornate).forEach(dataStr => {
+                const data = new Date(dataStr + 'T12:00:00');
+                if (data.getFullYear() === anno && data.getMonth() === mese) {
+                    lista.push({ data: data, importo: giornate[dataStr].importo });
+                    totale += giornate[dataStr].importo;
+                }
+            });
+            
+            lista.sort((a, b) => a.data - b.data);
+            
+            doc.setFontSize(12);
+            let y = 50;
+            
+            lista.forEach(g => {
+                const dataStr = g.data.getDate() + '/' + (g.data.getMonth() + 1) + '/' + g.data.getFullYear();
+                doc.text(dataStr, 20, y);
+                doc.text(g.importo.toFixed(2) + ' EUR', 170, y);
+                y += 10;
+                
+                if (y > 270) {
+                    doc.addPage();
+                    y = 20;
+                }
+            });
+            
+            doc.setFontSize(14);
+            doc.text('TOTALE: ' + totale.toFixed(2) + ' EUR', 105, y + 10, { align: 'center' });
+            
+            doc.save('calendario-' + nomiMesi[mese].toLowerCase() + '-' + anno + '.pdf');
+            mostraFeedback('✓ PDF scaricato!');
+            chiudiExport();
+        }
+
+        function esportaExcel() {
+            const anno = meseCorrente.getFullYear();
+            const mese = meseCorrente.getMonth();
+            const nomiMesi = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+                             'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+            
+            const data = [['Data', 'Importo (€)']];
+            let totale = 0;
+            
+            const lista = [];
+            Object.keys(giornate).forEach(dataStr => {
+                const d = new Date(dataStr + 'T12:00:00');
+                if (d.getFullYear() === anno && d.getMonth() === mese) {
+                    lista.push({ data: d, importo: giornate[dataStr].importo });
+                    totale += giornate[dataStr].importo;
+                }
+            });
+            
+            lista.sort((a, b) => a.data - b.data);
+            
+            lista.forEach(g => {
+                const dataStr = g.data.getDate() + '/' + (g.data.getMonth() + 1) + '/' + g.data.getFullYear();
+                data.push([dataStr, g.importo]);
+            });
+            
+            data.push(['', '']);
+            data.push(['TOTALE', totale]);
+            
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, nomiMesi[mese]);
+            
+            XLSX.writeFile(wb, 'calendario-' + nomiMesi[mese].toLowerCase() + '-' + anno + '.xlsx');
+            mostraFeedback('✓ Excel scaricato!');
+            chiudiExport();
+        }
+
+        // ============================================
+        // VOICE - MIGLIORATO
+        // ============================================
+
         function inizializzaVoce() {
-            if (!('webkitSpeechRecognition' in window)) return;
+            if (!('webkitSpeechRecognition' in window)) {
+                document.querySelector('.btn-voice').style.display = 'none';
+                return;
+            }
             
             recognition = new webkitSpeechRecognition();
             recognition.lang = 'it-IT';
-            recognition.continuous = false;
+            recognition.continuous = true; // Ascolto continuo
+            recognition.interimResults = true; // Mostra risultati parziali
+            recognition.maxAlternatives = 3; // Più alternative per miglior riconoscimento
             
-            recognition.onresult = (e) => {
-                const testo = e.results[0][0].transcript.toLowerCase();
-                document.getElementById('voiceStatus').textContent = '"' + testo + '"';
-                processaVoce(testo);
+            recognition.onstart = () => {
+                isListening = true;
+                const status = document.getElementById('voiceStatus');
+                status.textContent = '🎤 Ascoltando... (parla pure)';
+                status.classList.add('listening');
             };
             
-            recognition.onerror = () => mostraFeedback('❌ Errore voce');
-            recognition.onend = () => document.querySelector('.btn-voice').disabled = false;
+            recognition.onresult = (e) => {
+                let testoFinale = '';
+                for (let i = e.resultIndex; i < e.results.length; i++) {
+                    if (e.results[i].isFinal) {
+                        testoFinale += e.results[i][0].transcript;
+                    }
+                }
+                
+                if (testoFinale) {
+                    document.getElementById('voiceStatus').textContent = '"' + testoFinale + '"';
+                    setTimeout(() => {
+                        processaVoce(testoFinale.toLowerCase());
+                        fermaVoce();
+                    }, 500);
+                }
+            };
+            
+            recognition.onerror = (e) => {
+                console.log('Errore voce:', e.error);
+                fermaVoce();
+                if (e.error !== 'no-speech' && e.error !== 'aborted') {
+                    mostraFeedback('❌ Errore microfono');
+                }
+            };
+            
+            recognition.onend = () => {
+                isListening = false;
+                document.querySelector('.btn-voice').disabled = false;
+                const status = document.getElementById('voiceStatus');
+                status.classList.remove('listening');
+            };
         }
 
         function avviaVoce() {
             if (!recognition) return;
+            if (isListening) {
+                fermaVoce();
+                return;
+            }
+            
             document.querySelector('.btn-voice').disabled = true;
-            document.getElementById('voiceStatus').textContent = '🎤 Ascoltando...';
             recognition.start();
+        }
+
+        function fermaVoce() {
+            if (recognition && isListening) {
+                recognition.stop();
+                isListening = false;
+            }
         }
 
         function processaVoce(testo) {
@@ -591,7 +976,11 @@
                 'venerdì': 5, 'venerdi': 5, 'sabato': 6, 'domenica': 0
             };
             
-            const numeri = { 'settanta': 70, 'ottanta': 80, 'ottantacinque': 85, 'novanta': 90 };
+            const numeri = { 
+                'settanta': 70, 'settantacinque': 75, 
+                'ottanta': 80, 'ottantacinque': 85, 
+                'novanta': 90, 'cento': 100 
+            };
             
             const parti = testo.split(/,|\se\s/);
             let aggiunti = 0;
@@ -629,9 +1018,9 @@
             if (aggiunti > 0) {
                 salvaDati();
                 renderCalendario();
-                mostraFeedback('✓ Aggiunti ' + aggiunti + '!');
+                mostraFeedback('✓ Aggiunti ' + aggiunti + ' giorni!');
             } else {
-                mostraFeedback('❌ Non capito');
+                mostraFeedback('❌ Non capito. Riprova!');
             }
         }
 
