@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Calendario Lavoro</title>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding-bottom: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header h1 { font-size: 24px; color: #333; margin-bottom: 15px; }
+
+        .totale {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 15px;
+            border-radius: 15px;
+            color: white;
+        }
+
+        .totale-label { font-size: 14px; opacity: 0.9; margin-bottom: 5px; }
+        .totale-importo { font-size: 36px; font-weight: bold; }
+
+        .container { max-width: 500px; margin: 20px auto; padding: 0 15px; }
+
+        .nav-mese {
+            background: white;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .nav-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .mese-corrente { font-size: 18px; font-weight: 600; color: #333; }
+
+        .calendario {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+        }
+
+        .giorni-settimana {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .giorno-settimana {
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            padding: 5px;
+        }
+
+        .griglia-giorni {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+        }
+
+        .giorno {
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            cursor: pointer;
+            background: #f8f9fa;
+            transition: all 0.2s;
+        }
+
+        .giorno.altro-mese { opacity: 0.3; pointer-events: none; }
+        .giorno.oggi { border: 2px solid #667eea; }
+        
+        .giorno.lavorato {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: bold;
+        }
+
+        .giorno.weekend-lavorato {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            font-weight: bold;
+        }
+
+        .giorno.custom-lavorato {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            font-weight: bold;
+        }
+
+        .giorno-numero { font-size: 16px; }
+        .giorno-importo { font-size: 10px; margin-top: 2px; }
+
+        .voice-section {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .btn-voice { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+        .btn-copia { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+
+        .voice-status {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+            min-height: 20px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show { display: flex; }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .modal-header {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .modal-btns {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            color: white;
+        }
+
+        .btn-70 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .btn-85 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .btn-altro { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+
+        .custom-input { margin-bottom: 15px; }
+
+        .custom-input input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+        }
+
+        .modal-actions { display: flex; gap: 10px; }
+
+        .btn-conferma {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            color: white;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+
+        .btn-elimina {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            color: white;
+            background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%);
+        }
+
+        .btn-annulla {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            color: #666;
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>💰 Calendario Lavoro</h1>
+        <div class="totale">
+            <div class="totale-label">Totale mese</div>
+            <div class="totale-importo" id="totale">0€</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="nav-mese">
+            <button class="nav-btn" onclick="cambioMese(-1)">←</button>
+            <div class="mese-corrente" id="meseCorrente"></div>
+            <button class="nav-btn" onclick="cambioMese(1)">→</button>
+        </div>
+
+        <div class="calendario">
+            <div class="giorni-settimana">
+                <div class="giorno-settimana">Dom</div>
+                <div class="giorno-settimana">Lun</div>
+                <div class="giorno-settimana">Mar</div>
+                <div class="giorno-settimana">Mer</div>
+                <div class="giorno-settimana">Gio</div>
+                <div class="giorno-settimana">Ven</div>
+                <div class="giorno-settimana">Sab</div>
+            </div>
+            <div class="griglia-giorni" id="grigliaGiorni"></div>
+        </div>
+
+        <div class="voice-section">
+            <button class="btn btn-voice" onclick="avviaVoce()">🎤 Aggiungi con voce</button>
+            <button class="btn btn-copia" onclick="copiaRiepilogo()">📋 Copia riepilogo mese</button>
+            <div id="voiceStatus" class="voice-status"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <div class="modal-header" id="modalHeader"></div>
+            
+            <div class="modal-btns">
+                <button class="modal-btn btn-70" onclick="aggiungiImporto(70)">70€</button>
+                <button class="modal-btn btn-85" onclick="aggiungiImporto(85)">85€</button>
+                <button class="modal-btn btn-altro" onclick="mostraCustom()">Altro</button>
+            </div>
+
+            <div class="custom-input" id="customInput" style="display:none;">
+                <input type="number" id="importoCustom" placeholder="Importo €" step="0.01">
+            </div>
+
+            <div class="modal-actions" id="modalActions">
+                <button class="btn-annulla" onclick="chiudiModal()">Annulla</button>
+                <button class="btn-conferma" id="btnConferma" onclick="confermaCustom()" style="display:none;">Conferma</button>
+            </div>
+            
+            <div class="modal-actions" id="modalActionsElimina" style="display:none;">
+                <button class="btn-annulla" onclick="chiudiModal()">Annulla</button>
+                <button class="btn-elimina" onclick="eliminaGiornata()">Elimina</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let giornate = {};
+        let meseCorrente = new Date();
+        let giornoSelezionato = null;
+        let recognition = null;
+
+        window.addEventListener('load', () => {
+            caricaDati();
+            inizializzaVoce();
+            renderCalendario();
+        });
+
+        function caricaDati() {
+            const dati = localStorage.getItem('giornate_calendario');
+            if (dati) giornate = JSON.parse(dati);
+        }
+
+        function salvaDati() {
+            localStorage.setItem('giornate_calendario', JSON.stringify(giornate));
+        }
+
+        function renderCalendario() {
+            const anno = meseCorrente.getFullYear();
+            const mese = meseCorrente.getMonth();
+            
+            const nomiMesi = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+                             'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+            document.getElementById('meseCorrente').textContent = nomiMesi[mese] + ' ' + anno;
+            
+            const primoGiorno = new Date(anno, mese, 1).getDay();
+            const giorniMese = new Date(anno, mese + 1, 0).getDate();
+            
+            const griglia = document.getElementById('grigliaGiorni');
+            griglia.innerHTML = '';
+            
+            for (let i = 0; i < primoGiorno; i++) {
+                const div = document.createElement('div');
+                div.className = 'giorno altro-mese';
+                griglia.appendChild(div);
+            }
+            
+            const oggi = new Date();
+            const oggiStr = oggi.toISOString().split('T')[0];
+            
+            for (let giorno = 1; giorno <= giorniMese; giorno++) {
+                const dataStr = anno + '-' + String(mese + 1).padStart(2, '0') + '-' + String(giorno).padStart(2, '0');
+                
+                const div = document.createElement('div');
+                div.className = 'giorno';
+                
+                if (dataStr === oggiStr) div.classList.add('oggi');
+                
+                if (giornate[dataStr]) {
+                    const tipo = giornate[dataStr].tipo;
+                    if (tipo === 'weekend') div.classList.add('weekend-lavorato');
+                    else if (tipo === 'custom') div.classList.add('custom-lavorato');
+                    else div.classList.add('lavorato');
+                    
+                    div.innerHTML = '<div class="giorno-numero">' + giorno + '</div><div class="giorno-importo">' + giornate[dataStr].importo + '€</div>';
+                } else {
+                    div.innerHTML = '<div class="giorno-numero">' + giorno + '</div>';
+                }
+                
+                div.onclick = () => apriModal(dataStr);
+                griglia.appendChild(div);
+            }
+            
+            aggiornaTotale();
+        }
+
+        function cambioMese(dir) {
+            meseCorrente.setMonth(meseCorrente.getMonth() + dir);
+            renderCalendario();
+        }
+
+        function aggiornaTotale() {
+            const anno = meseCorrente.getFullYear();
+            const mese = meseCorrente.getMonth();
+            let totale = 0;
+            
+            Object.keys(giornate).forEach(dataStr => {
+                const data = new Date(dataStr + 'T12:00:00');
+                if (data.getFullYear() === anno && data.getMonth() === mese) {
+                    totale += giornate[dataStr].importo;
+                }
+            });
+            
+            document.getElementById('totale').textContent = totale.toFixed(2) + '€';
+        }
+
+        function apriModal(dataStr) {
+            giornoSelezionato = dataStr;
+            console.log('Apertura modal per:', dataStr);
+            console.log('Giornata esistente?', giornate[dataStr]);
+            
+            const data = new Date(dataStr + 'T12:00:00');
+            const giorno = data.getDate();
+            const nomiMesi = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+                             'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+            
+            if (giornate[dataStr]) {
+                console.log('Mostrando pulsante ELIMINA');
+                document.getElementById('modalHeader').textContent = giorno + ' ' + nomiMesi[data.getMonth()] + ' - ' + giornate[dataStr].importo + '€';
+                document.getElementById('modalActions').style.display = 'none';
+                document.getElementById('modalActionsElimina').style.display = 'flex';
+            } else {
+                console.log('Mostrando pulsanti AGGIUNGI');
+                document.getElementById('modalHeader').textContent = 'Aggiungi ' + giorno + ' ' + nomiMesi[data.getMonth()];
+                document.getElementById('modalActions').style.display = 'flex';
+                document.getElementById('modalActionsElimina').style.display = 'none';
+            }
+            
+            document.getElementById('customInput').style.display = 'none';
+            document.getElementById('btnConferma').style.display = 'none';
+            document.getElementById('importoCustom').value = '';
+            document.getElementById('modal').classList.add('show');
+        }
+
+        function chiudiModal() {
+            document.getElementById('modal').classList.remove('show');
+            giornoSelezionato = null;
+        }
+
+        function mostraCustom() {
+            document.getElementById('customInput').style.display = 'block';
+            document.getElementById('btnConferma').style.display = 'block';
+            document.getElementById('importoCustom').focus();
+        }
+
+        function aggiungiImporto(importo) {
+            if (!giornoSelezionato) return;
+            let tipo = importo === 85 ? 'weekend' : 'infrasettimanale';
+            giornate[giornoSelezionato] = { importo, tipo };
+            salvaDati();
+            renderCalendario();
+            chiudiModal();
+            mostraFeedback('✓ Aggiunto!');
+        }
+
+        function confermaCustom() {
+            if (!giornoSelezionato) return;
+            const importo = parseFloat(document.getElementById('importoCustom').value);
+            if (!importo || importo <= 0) {
+                alert('Importo non valido!');
+                return;
+            }
+            giornate[giornoSelezionato] = { importo, tipo: 'custom' };
+            salvaDati();
+            renderCalendario();
+            chiudiModal();
+            mostraFeedback('✓ Aggiunto!');
+        }
+
+        function eliminaGiornata() {
+            console.log('Eliminazione chiamata per:', giornoSelezionato);
+            if (!giornoSelezionato) {
+                alert('Errore: nessun giorno selezionato');
+                return;
+            }
+            // Rimosso confirm - elimina direttamente
+            console.log('Prima eliminazione:', giornate);
+            delete giornate[giornoSelezionato];
+            console.log('Dopo eliminazione:', giornate);
+            salvaDati();
+            renderCalendario();
+            chiudiModal();
+            mostraFeedback('✓ Eliminato!');
+        }
+
+        function mostraFeedback(msg) {
+            const status = document.getElementById('voiceStatus');
+            status.textContent = msg;
+            status.style.background = '#4caf50';
+            status.style.color = 'white';
+            setTimeout(() => {
+                status.textContent = '';
+                status.style.background = '#f0f0f0';
+                status.style.color = '#666';
+            }, 2000);
+        }
+
+        function copiaRiepilogo() {
+            const anno = meseCorrente.getFullYear();
+            const mese = meseCorrente.getMonth();
+            const nomiMesi = ['GENNAIO', 'FEBBRAIO', 'MARZO', 'APRILE', 'MAGGIO', 'GIUGNO',
+                             'LUGLIO', 'AGOSTO', 'SETTEMBRE', 'OTTOBRE', 'NOVEMBRE', 'DICEMBRE'];
+            const giorni = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+            
+            const lista = [];
+            let totale = 0;
+            
+            Object.keys(giornate).forEach(dataStr => {
+                const data = new Date(dataStr + 'T12:00:00');
+                if (data.getFullYear() === anno && data.getMonth() === mese) {
+                    lista.push({
+                        data: data,
+                        importo: giornate[dataStr].importo
+                    });
+                    totale += giornate[dataStr].importo;
+                }
+            });
+            
+            lista.sort((a, b) => a.data - b.data);
+            
+            let testo = '📅 ' + nomiMesi[mese] + ' ' + anno + '\n\n';
+            
+            if (lista.length === 0) {
+                testo += 'Nessuna giornata lavorata\n';
+            } else {
+                lista.forEach(g => {
+                    const gg = giorni[g.data.getDay()];
+                    const num = g.data.getDate();
+                    const mm = nomiMesi[g.data.getMonth()].slice(0, 3);
+                    testo += gg + ' ' + num + ' ' + mm.charAt(0) + mm.slice(1).toLowerCase() + ' - ' + g.importo.toFixed(2) + '€\n';
+                });
+            }
+            
+            testo += '\n💰 TOTALE: ' + totale.toFixed(2) + '€';
+            
+            const textarea = document.createElement('textarea');
+            textarea.value = testo;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                document.execCommand('copy');
+                mostraFeedback('✓ Copiato!');
+            } catch (err) {
+                mostraFeedback('❌ Errore');
+            }
+            
+            document.body.removeChild(textarea);
+        }
+
+        function inizializzaVoce() {
+            if (!('webkitSpeechRecognition' in window)) return;
+            
+            recognition = new webkitSpeechRecognition();
+            recognition.lang = 'it-IT';
+            recognition.continuous = false;
+            
+            recognition.onresult = (e) => {
+                const testo = e.results[0][0].transcript.toLowerCase();
+                document.getElementById('voiceStatus').textContent = '"' + testo + '"';
+                processaVoce(testo);
+            };
+            
+            recognition.onerror = () => mostraFeedback('❌ Errore voce');
+            recognition.onend = () => document.querySelector('.btn-voice').disabled = false;
+        }
+
+        function avviaVoce() {
+            if (!recognition) return;
+            document.querySelector('.btn-voice').disabled = true;
+            document.getElementById('voiceStatus').textContent = '🎤 Ascoltando...';
+            recognition.start();
+        }
+
+        function processaVoce(testo) {
+            const giorni = {
+                'lunedì': 1, 'lunedi': 1, 'martedì': 2, 'martedi': 2,
+                'mercoledì': 3, 'mercoledi': 3, 'giovedì': 4, 'giovedi': 4,
+                'venerdì': 5, 'venerdi': 5, 'sabato': 6, 'domenica': 0
+            };
+            
+            const numeri = { 'settanta': 70, 'ottanta': 80, 'ottantacinque': 85, 'novanta': 90 };
+            
+            const parti = testo.split(/,|\se\s/);
+            let aggiunti = 0;
+            
+            parti.forEach(parte => {
+                parte = parte.trim();
+                let giorno = null;
+                let importo = null;
+                
+                for (let [nome, num] of Object.entries(giorni)) {
+                    if (parte.includes(nome)) {
+                        giorno = num;
+                        break;
+                    }
+                }
+                
+                const match = parte.match(/\d+/);
+                if (match) importo = parseInt(match[0]);
+                
+                for (let [parola, val] of Object.entries(numeri)) {
+                    if (parte.includes(parola)) {
+                        importo = val;
+                        break;
+                    }
+                }
+                
+                if (giorno !== null && importo) {
+                    const dataStr = calcolaData(giorno);
+                    let tipo = importo === 85 ? 'weekend' : (importo === 70 ? 'infrasettimanale' : 'custom');
+                    giornate[dataStr] = { importo, tipo };
+                    aggiunti++;
+                }
+            });
+            
+            if (aggiunti > 0) {
+                salvaDati();
+                renderCalendario();
+                mostraFeedback('✓ Aggiunti ' + aggiunti + '!');
+            } else {
+                mostraFeedback('❌ Non capito');
+            }
+        }
+
+        function calcolaData(giornoTarget) {
+            const oggi = new Date();
+            const giornoOggi = oggi.getDay();
+            let diff = giornoTarget - giornoOggi;
+            if (diff <= 0) diff += 7;
+            const data = new Date(oggi);
+            data.setDate(oggi.getDate() + diff);
+            return data.getFullYear() + '-' + String(data.getMonth() + 1).padStart(2, '0') + '-' + String(data.getDate()).padStart(2, '0');
+        }
+    </script>
+</body>
+</html>
