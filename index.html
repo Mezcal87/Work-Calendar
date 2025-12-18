@@ -989,142 +989,128 @@
         }
 
         // ============================================
-        // VOICE - MIGLIORATO
+        // VOICE - N8N + GROQ WHISPER
         // ============================================
 
+        const WEBHOOK_URL = 'https://n8n.srv1141198.hstgr.cloud/webhook/calendario-voce';
+        let mediaRecorder = null;
+        let audioChunks = [];
+
         function inizializzaVoce() {
-            if (!('webkitSpeechRecognition' in window)) {
+            // Verifica supporto MediaRecorder
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 document.querySelector('.btn-voice').style.display = 'none';
                 return;
             }
-            
-            recognition = new webkitSpeechRecognition();
-            recognition.lang = 'it-IT';
-            recognition.continuous = true; // Ascolto continuo
-            recognition.interimResults = true; // Mostra risultati parziali
-            recognition.maxAlternatives = 3; // Più alternative per miglior riconoscimento
-            
-            recognition.onstart = () => {
-                isListening = true;
-                const status = document.getElementById('voiceStatus');
-                status.textContent = '🎤 Ascoltando... (parla pure)';
-                status.classList.add('listening');
-            };
-            
-            recognition.onresult = (e) => {
-                let testoFinale = '';
-                for (let i = e.resultIndex; i < e.results.length; i++) {
-                    if (e.results[i].isFinal) {
-                        testoFinale += e.results[i][0].transcript;
-                    }
-                }
-                
-                if (testoFinale) {
-                    document.getElementById('voiceStatus').textContent = '"' + testoFinale + '"';
-                    setTimeout(() => {
-                        processaVoce(testoFinale.toLowerCase());
-                        fermaVoce();
-                    }, 500);
-                }
-            };
-            
-            recognition.onerror = (e) => {
-                console.log('Errore voce:', e.error);
-                fermaVoce();
-                if (e.error !== 'no-speech' && e.error !== 'aborted') {
-                    mostraFeedback('❌ Errore microfono');
-                }
-            };
-            
-            recognition.onend = () => {
-                isListening = false;
-                document.querySelector('.btn-voice').disabled = false;
-                const status = document.getElementById('voiceStatus');
-                status.classList.remove('listening');
-            };
         }
 
-        function avviaVoce() {
-            if (!recognition) return;
-            if (isListening) {
-                fermaVoce();
+        async function avviaVoce() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                // Ferma registrazione
+                fermaRegistrazione();
                 return;
             }
-            
-            document.querySelector('.btn-voice').disabled = true;
-            recognition.start();
-        }
 
-        function fermaVoce() {
-            if (recognition && isListening) {
-                recognition.stop();
-                isListening = false;
+            try {
+                // Richiedi permesso microfono
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    // Crea blob audio
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    
+                    // Invia a N8N
+                    await inviaAudioAN8N(audioBlob);
+                    
+                    // Ferma stream
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                // Avvia registrazione
+                mediaRecorder.start();
+                
+                const status = document.getElementById('voiceStatus');
+                status.textContent = '🎤 Registrando... (tocca per fermare)';
+                status.classList.add('listening');
+                
+                document.querySelector('.btn-voice').textContent = '⏹️ Ferma';
+
+            } catch (err) {
+                console.error('Errore microfono:', err);
+                mostraFeedback('❌ Permesso microfono negato');
             }
         }
 
-        function processaVoce(testo) {
-            const giorni = {
-                'lunedì': 1, 'lunedi': 1, 'martedì': 2, 'martedi': 2,
-                'mercoledì': 3, 'mercoledi': 3, 'giovedì': 4, 'giovedi': 4,
-                'venerdì': 5, 'venerdi': 5, 'sabato': 6, 'domenica': 0
-            };
-            
-            const numeri = { 
-                'settanta': 70, 'settantacinque': 75, 
-                'ottanta': 80, 'ottantacinque': 85, 
-                'novanta': 90, 'cento': 100 
-            };
-            
-            const parti = testo.split(/,|\se\s/);
-            let aggiunti = 0;
-            
-            parti.forEach(parte => {
-                parte = parte.trim();
-                let giorno = null;
-                let importo = null;
+        function fermaRegistrazione() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                document.querySelector('.btn-voice').textContent = '🎤 Aggiungi con voce';
                 
-                for (let [nome, num] of Object.entries(giorni)) {
-                    if (parte.includes(nome)) {
-                        giorno = num;
-                        break;
-                    }
-                }
-                
-                const match = parte.match(/\d+/);
-                if (match) importo = parseInt(match[0]);
-                
-                for (let [parola, val] of Object.entries(numeri)) {
-                    if (parte.includes(parola)) {
-                        importo = val;
-                        break;
-                    }
-                }
-                
-                if (giorno !== null && importo) {
-                    const dataStr = calcolaData(giorno);
-                    let tipo = importo === 85 ? 'weekend' : (importo === 70 ? 'infrasettimanale' : 'custom');
-                    giornate[dataStr] = { importo, tipo };
-                    aggiunti++;
-                }
-            });
-            
-            if (aggiunti > 0) {
-                salvaDati();
-                renderCalendario();
-                mostraFeedback('✓ Aggiunti ' + aggiunti + ' giorni!');
-            } else {
-                mostraFeedback('❌ Non capito. Riprova!');
+                const status = document.getElementById('voiceStatus');
+                status.textContent = '⏳ Elaborando...';
+                status.classList.remove('listening');
             }
         }
 
-        function calcolaData(giornoTarget) {
-            const oggi = new Date();
-            const giornoOggi = oggi.getDay();
-            let diff = giornoTarget - giornoOggi;
-            if (diff <= 0) diff += 7;
-            const data = new Date(oggi);
-            data.setDate(oggi.getDate() + diff);
-            return data.getFullYear() + '-' + String(data.getMonth() + 1).padStart(2, '0') + '-' + String(data.getDate()).padStart(2, '0');
+        async function inviaAudioAN8N(audioBlob) {
+            try {
+                // Converti blob in base64
+                const reader = new FileReader();
+                reader.readAsDataURL(audioBlob);
+                
+                reader.onloadend = async () => {
+                    const base64Audio = reader.result.split(',')[1];
+                    
+                    // Invia a N8N
+                    const response = await fetch(WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            audio: base64Audio
+                        })
+                    });
+
+                    const risultato = await response.json();
+                    
+                    if (risultato.successo && risultato.giornate && risultato.giornate.length > 0) {
+                        // Aggiungi tutte le giornate riconosciute
+                        risultato.giornate.forEach(g => {
+                            giornate[g.data] = {
+                                importo: g.importo,
+                                tipo: g.tipo
+                            };
+                        });
+                        
+                        salvaDati();
+                        renderCalendario();
+                        mostraFeedback(`✓ Aggiunte ${risultato.giornate.length} giornate!`);
+                        
+                        // Mostra trascrizione
+                        if (risultato.trascrizione) {
+                            setTimeout(() => {
+                                document.getElementById('voiceStatus').textContent = `"${risultato.trascrizione}"`;
+                            }, 2000);
+                        }
+                    } else {
+                        mostraFeedback('❌ Non ho capito. Riprova!');
+                        if (risultato.trascrizione) {
+                            document.getElementById('voiceStatus').textContent = `Hai detto: "${risultato.trascrizione}"`;
+                        }
+                    }
+                };
+            } catch (err) {
+                console.error('Errore invio audio:', err);
+                mostraFeedback('❌ Errore connessione');
+            }
         }
     </script>
 </body>
