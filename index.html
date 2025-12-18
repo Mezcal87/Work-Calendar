@@ -155,6 +155,7 @@
         .btn-export { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
         .btn-stats { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
         .btn-confronto { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .btn-backup { background: linear-gradient(135deg, #FF6B6B 0%, #FFE66D 100%); }
 
         .voice-status {
             margin-top: 10px;
@@ -382,6 +383,7 @@
             <button class="btn btn-stats" onclick="apriStats()">📊 Statistiche</button>
             <button class="btn btn-confronto" onclick="apriConfronto()">📈 Confronto mesi</button>
             <button class="btn btn-export" onclick="apriExport()">📤 Condividi/Esporta</button>
+            <button class="btn btn-backup" onclick="apriBackup()">💾 Backup/Importa</button>
             <div id="voiceStatus" class="voice-status"></div>
         </div>
     </div>
@@ -478,6 +480,31 @@
 
             <div class="modal-actions" style="margin-top: 20px;">
                 <button class="btn-annulla" onclick="chiudiConfronto()">Chiudi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal backup -->
+    <div class="modal" id="modalBackup">
+        <div class="modal-content">
+            <div class="modal-header">💾 Backup/Importa</div>
+            
+            <div class="export-options">
+                <button class="export-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);" onclick="esportaBackup()">
+                    📥 Scarica Backup
+                </button>
+                <button class="export-btn" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);" onclick="document.getElementById('fileInput').click()">
+                    📤 Importa Backup
+                </button>
+                <input type="file" id="fileInput" accept=".json" style="display:none;" onchange="importaBackup(event)">
+            </div>
+
+            <div style="margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 10px; font-size: 13px; color: #856404;">
+                ⚠️ Il backup salva tutti i tuoi dati. Conservalo al sicuro!
+            </div>
+
+            <div class="modal-actions" style="margin-top: 20px;">
+                <button class="btn-annulla" onclick="chiudiBackup()">Chiudi</button>
             </div>
         </div>
     </div>
@@ -625,6 +652,72 @@
 
         function chiudiConfronto() {
             document.getElementById('modalConfronto').classList.remove('show');
+        }
+
+        // ============================================
+        // BACKUP / IMPORT
+        // ============================================
+
+        function apriBackup() {
+            document.getElementById('modalBackup').classList.add('show');
+        }
+
+        function chiudiBackup() {
+            document.getElementById('modalBackup').classList.remove('show');
+        }
+
+        function esportaBackup() {
+            const backup = {
+                version: '1.0',
+                data: giornate,
+                exportDate: new Date().toISOString(),
+                totalDays: Object.keys(giornate).length
+            };
+            
+            const dataStr = JSON.stringify(backup, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'calendario-backup-' + new Date().toISOString().split('T')[0] + '.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            mostraFeedback('✓ Backup scaricato!');
+            chiudiBackup();
+        }
+
+        function importaBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const backup = JSON.parse(e.target.result);
+                    
+                    if (!backup.data) {
+                        alert('File backup non valido!');
+                        return;
+                    }
+                    
+                    if (confirm('Importare ' + Object.keys(backup.data).length + ' giornate?\n\nATTENZIONE: I dati attuali verranno sovrascritti!')) {
+                        giornate = backup.data;
+                        salvaDati();
+                        renderCalendario();
+                        mostraFeedback('✓ Backup importato!');
+                        chiudiBackup();
+                    }
+                } catch (err) {
+                    alert('Errore nel file backup!');
+                }
+            };
+            reader.readAsText(file);
+            
+            event.target.value = '';
         }
 
         function aggiornaConfronto() {
