@@ -1,14 +1,15 @@
 <!DOCTYPE html>
+
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Calendario Lavoro</title>
-    
+
     <!-- Librerie per export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    
+
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -303,6 +304,7 @@
         }
 
         .export-copia { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .export-giorni { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
         .export-pdf { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
         .export-excel { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
 
@@ -348,6 +350,7 @@
         .mese-nome { color: #666; font-size: 14px; font-weight: 500; }
         .mese-totale { color: #667eea; font-weight: bold; font-size: 16px; }
     </style>
+
 </head>
 <body>
     <div class="header">
@@ -422,7 +425,10 @@
             
             <div class="export-options">
                 <button class="export-btn export-copia" onclick="copiaRiepilogo()">
-                    📋 Copia testo
+                    📋 Copia testo completo
+                </button>
+                <button class="export-btn export-giorni" onclick="copiaSoloGiorni()">
+                    📅 Copia solo giorni
                 </button>
                 <button class="export-btn export-pdf" onclick="esportaPDF()">
                     📄 Scarica PDF
@@ -900,6 +906,55 @@
             document.body.removeChild(textarea);
         }
 
+        function copiaSoloGiorni() {
+            const anno = meseCorrente.getFullYear();
+            const mese = meseCorrente.getMonth();
+            const nomiMesi = ['GENNAIO', 'FEBBRAIO', 'MARZO', 'APRILE', 'MAGGIO', 'GIUGNO',
+                             'LUGLIO', 'AGOSTO', 'SETTEMBRE', 'OTTOBRE', 'NOVEMBRE', 'DICEMBRE'];
+            const giorni = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+            
+            const lista = [];
+            
+            Object.keys(giornate).forEach(dataStr => {
+                const data = new Date(dataStr + 'T12:00:00');
+                if (data.getFullYear() === anno && data.getMonth() === mese) {
+                    lista.push({ data: data });
+                }
+            });
+            
+            lista.sort((a, b) => a.data - b.data);
+            
+            let testo = '📅 ' + nomiMesi[mese] + ' ' + anno + '\n\n';
+            
+            if (lista.length === 0) {
+                testo += 'Nessuna giornata lavorata\n';
+            } else {
+                lista.forEach(g => {
+                    const gg = giorni[g.data.getDay()];
+                    const num = g.data.getDate();
+                    const mm = nomiMesi[g.data.getMonth()].slice(0, 3);
+                    testo += gg + ' ' + num + ' ' + mm.charAt(0) + mm.slice(1).toLowerCase() + '\n';
+                });
+            }
+            
+            const textarea = document.createElement('textarea');
+            textarea.value = testo;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                document.execCommand('copy');
+                mostraFeedback('✓ Giorni copiati!');
+                chiudiExport();
+            } catch (err) {
+                mostraFeedback('❌ Errore');
+            }
+            
+            document.body.removeChild(textarea);
+        }
+
         function esportaPDF() {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
@@ -1113,5 +1168,6 @@
             }
         }
     </script>
+
 </body>
 </html>
